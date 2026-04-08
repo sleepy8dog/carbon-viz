@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>全球人均碳排放趋势</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body { 
+            font-family: 'Arial', sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            background: #f9f9f9;
+        }
+        .container { 
+            max-width: 1000px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 30px; 
+            border-radius: 10px; 
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+        h1 { 
+            text-align: center; 
+            color: #2c3e50; 
+        }
+        .chart-container {
+            position: relative;
+        }
+        /* 图例样式 */
+        .legend {
+            margin-top: 20px;
+            text-align: center;
+        }
+        .legend-item {
+            display: inline-block;
+            margin: 0 10px;
+            cursor: pointer;
+            padding: 5px 10px;
+            border-radius: 4px;
+        }
+        .legend-item:hover {
+            background: #eee;
+        }
+        /* 提示框样式 */
+        .tooltip {
+            position: absolute;
+            padding: 10px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            border-radius: 4px;
+            pointer-events: none;
+            font-size: 14px;
+            opacity: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌍 全球人均温室气体排放趋势 (2014-2023)</h1>
+        <p style="text-align: center; color: #666;">
+            数据来源：OECD 数据库 | 交互说明：鼠标悬停查看具体数值，点击图例高亮/隐藏国家
+        </p>
+        
+        <!-- 图表画布 -->
+        <div id="chart" class="chart-container"></div>
+        
+        <!-- 动态图例 -->
+        <div id="legend" class="legend"></div>
+        
+        <!-- 提示框 -->
+        <div id="tooltip" class="tooltip"></div>
+    </div>
+
+    <script>
+        // 1. 设置画布参数
+        const margin = {top: 40, right: 100, bottom: 60, left: 60};
+        const width = 800 - margin.left - margin.right;
+        const height = 500 - margin.top - margin.bottom;
+
+        // 2. 创建 SVG
+        const svg = d3.select("#chart")
+            .append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+            .attr("transform", `translate(${margin.left},${margin.top})`);
+
+        // 3. 定义颜色
+        const colorScale = d3.scaleOrdinal(d3.schemeCategory10);
+
+        // 4. 读取数据
+        d3.csv("data.csv").then(data => {
+            // 数据处理：转换数据格式以便绘图
+            const years = data.map(d => d.year);
+            const countries = Object.keys(data[0]).slice(1); // 获取所有国家名
+
+            // 为每个国家生成一条线的数据
+            const lines = countries.map(country => ({
+                name: country,
+                values: data.map(d => ({year: d.year, emission: +d[country]}))
+            }));
+
+            // 设置颜色域
+            colorScale.domain(countries);
+
+            // 5. 定义比例尺 (Scales)
+            const x = d3.scalePoint().domain(years).range([0, width]);
+            const y = d3.scaleLinear().domain([0, 25]).range([height, 0]); // OECD数据最大约22，设为25留出空间
+
+            // 6. 定义线条生成器
+            const line = d3.line()
+                .x(d => x(d.year))
+                .y(d => y(d.emission))
+                .curve(d3.curveMonotoneX); // 平滑曲线
+
+            // 7. 绘制坐标轴
+            svg.append("g")
+                .attr("transform", `translate(0,${height})`)
+                .call(d3.axisBottom(x))
+                .append("text")
+                .attr("x", width/2)
+                .attr("y", 40)
+                .attr("fill", "#000")
+                .text("年份");
+
+            svg.append("g")
+                .call(d3.axisLeft(y))
+                .append("text")
+                .attr("transform", "rotate(-90)")
+                .attr("y", -40)
+                .attr("x", -height/2)
+                .attr("fill", "#000")
+                .text("人均排放量 (吨 CO2当量)");
+
+            // 8. 绘制折线
+            const paths = svg.selectAll(".line")
+                .data(lines)
+                .enter()
+                .append("g")
+                .attr("class", "line-group")
+                .append("path")
+                .attr("class", "line")
+                .attr("d", d => line(d.values))
+                .attr("fill", "none")
+                .attr("stroke", d => colorScale(d.name))
+                .attr("stroke-width", 2)
+                .style("opacity", 0.8);
+
+            // 9. 添加数据点 (圆圈)
+            const dots = svg.selectAll(".dot-group")
+                .data(lines)
+                .enter()
+                .append("g")
+                .attr("class", "dot-group")
+                .selectAll(".dot")
+                .data(d => d.values.map(v => ({...v, country: d.name})))
+                .enter()
+                .append("circle")
+                .attr("class", "dot")
+                .attr("cx", d => x(d.year))
+                .attr("cy", d => y(d.emission))
+                .attr("r", 4)
+                .attr("fill", d => colorScale(d.country))
+                .style("opacity", 0.9);
+
+            // 10. 交互功能：鼠标悬停 (Tooltip)
+            const tooltip = d3.select("#tooltip");
+            
+            // 给圆点添加监听
+            dots.on("mouseover", function(event, d) {
+                tooltip.style("opacity", 1)
+                    .html(`<b>${d.country}</b><br/>${d.year}: ${d.emission} 吨`)
+                    .style("left", (event.pageX + 10) + "px")
+                    .style("top", (event.pageY - 28) + "px");
+                
+                // 高亮当前圆点
+                d3.select(this).attr("r", 6).style("opacity", 1);
+            })
+            .on("mousemove", function(event, d) {
+                tooltip.style("left", (event.pageX + 10) + "px")
+                       .style("top", (event.pageY - 28) + "px");
+            })
+            .on("mouseout", function() {
+                tooltip.style("opacity", 0);
+                d3.select(this).attr("r", 4).style("opacity", 0.9);
+            });
+
+            // 11. 交互功能：图例点击 (高亮/淡化)
+            const legend = d3.select("#legend");
+            
+            legend.selectAll(".legend-item")
+                .data(countries)
+                .enter()
+                .append("span")
+                .attr("class", "legend-item")
+                .style("color", d => colorScale(d))
+                .text(d => d)
+                .on("click", function(event, countryName) {
+                    // 获取当前点击的图例元素
+                  const item = d3.select(this);
+                  // 切换选中状态
+                  const isActive = item.classed("active");
+                  item.classed("active", !isActive);
+
+                  // 根据状态改变图表中线条和圆点的透明度
+                  svg.selectAll(".line-group").filter(d => d.name === countryName)
+                     .transition().duration(300)
+                     .style("opacity", isActive ? 0.2 : 1);
+
+                  svg.selectAll(".dot-group").filter(d => d.name === countryName)
+                     .transition().duration(300)
+                     .style("opacity", isActive ? 0.2 : 1);
+                });
+        }).catch(error => {
+            console.error("数据加载失败，请确保 data.csv 和 index.html 在同一个文件夹，并使用 Live Server 打开。", error);
+            alert("数据加载失败！请检查控制台错误。");
+        });
+    </script>
+</body>
+</html>
