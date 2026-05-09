@@ -3,257 +3,776 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>全球人均碳排放趋势</title>
+    <title>全球人均碳排放：十年气候行动追踪</title>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
+        * { box-sizing: border-box; }
         body { 
-            font-family: 'Arial', sans-serif; 
+            font-family: 'Segoe UI', 'Arial', sans-serif; 
             margin: 0; 
             padding: 20px; 
-            background: #f9f9f9;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
         }
         .container { 
-            max-width: 1000px; 
+            max-width: 1400px; 
             margin: 0 auto; 
             background: white; 
             padding: 30px; 
-            border-radius: 10px; 
-            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            border-radius: 20px; 
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
         }
-        h1 { 
-            text-align: center; 
-            color: #2c3e50; 
+        h1 { text-align: center; color: #2c3e50; margin-bottom: 10px; }
+        .subtitle { text-align: center; color: #666; margin-bottom: 30px; font-size: 1.1em; }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1.5fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
         }
-        .chart-container {
-            position: relative;
+        
+        .bottom-charts {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 2px solid #eee;
         }
-        /* 图例样式 */
+        
+        .chart-card {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .chart-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #2c3e50;
+            border-left: 4px solid #667eea;
+            padding-left: 12px;
+        }
+        .control-bar {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+            justify-content: center;
+        }
+        button {
+            padding: 10px 20px;
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+        button:hover {
+            background: #667eea;
+            color: white;
+            transform: translateY(-2px);
+        }
         .legend {
             margin-top: 20px;
-            text-align: center;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+            max-height: 120px;
+            overflow-y: auto;
+            padding: 10px;
         }
         .legend-item {
-            display: inline-block;
-            margin: 0 10px;
+            padding: 5px 12px;
+            border-radius: 20px;
             cursor: pointer;
-            padding: 5px 10px;
-            border-radius: 4px;
+            transition: all 0.2s;
+            font-size: 12px;
+            background: #f0f0f0;
         }
         .legend-item:hover {
-            background: #eee;
+            transform: scale(1.05);
+            background: #667eea;
+            color: white;
         }
-        /* 提示框样式 */
         .tooltip {
             position: absolute;
-            padding: 10px;
-            background: rgba(0,0,0,0.8);
+            padding: 12px;
+            background: rgba(0,0,0,0.85);
             color: white;
-            border-radius: 4px;
+            border-radius: 8px;
             pointer-events: none;
-            font-size: 14px;
-            opacity: 0;
+            font-size: 13px;
+            z-index: 100;
         }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 12px;
+            text-align: center;
+        }
+        .stat-value { font-size: 1.5em; font-weight: bold; }
+        .stat-label { font-size: 12px; opacity: 0.9; margin-bottom: 5px; }
+        @media (max-width: 768px) {
+            .dashboard { grid-template-columns: 1fr; }
+            .bottom-charts { grid-template-columns: 1fr; }
+            .container { padding: 15px; }
+            button { padding: 6px 12px; font-size: 12px; }
+        }
+        .insight-text {
+            background: #e8f4f8;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            border-left: 4px solid #667eea;
+            font-size: 14px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            backdrop-filter: blur(5px);
+        }
+        .modal-content {
+            background: white;
+            margin: 5% auto;
+            padding: 0;
+            width: 90%;
+            max-width: 600px;
+            border-radius: 20px;
+            animation: slideDown 0.3s ease-out;
+        }
+        @keyframes slideDown {
+            from { transform: translateY(-50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .modal-header {
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 20px 20px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-header h2 { margin: 0; }
+        .close {
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .close:hover { transform: scale(1.2); }
+        .modal-body { padding: 20px; }
+        .country-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .country-stat-card {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 12px;
+            text-align: center;
+        }
+        .country-stat-value { font-size: 24px; font-weight: bold; color: #667eea; }
+        .trend-up { color: #e74c3c; }
+        .trend-down { color: #27ae60; }
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            margin-left: 8px;
+        }
+        .badge-high { background: #e74c3c; color: white; }
+        .badge-low { background: #27ae60; color: white; }
+        .badge-mid { background: #f39c12; color: white; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🌍 全球人均温室气体排放趋势 (2014-2023)</h1>
-        <p style="text-align: center; color: #666;">
-            数据来源：OECD 数据库 | 交互说明：鼠标悬停查看具体数值，点击图例高亮/隐藏国家
-        </p>
-        
-        <!-- 图表画布 -->
-        <div id="chart" class="chart-container"></div>
-        
-        <!-- 动态图例 -->
-        <div id="legend" class="legend"></div>
-         <!-- 作业说明文档部分 -->
-<div style="padding: 20px; background-color: #f9f9f9; border-top: 1px solid #ddd; margin-top: 20px;">
-    <h2>📝 作业说明文档</h2>
-    
-    <h3>1. 可视化方案旨在解答什么问题？</h3>
-    <p>本项目旨在探索 <strong>2014年至2023年间</strong>，全球主要国家（OECD成员国）的<strong>人均温室气体排放量</strong>的变化趋势。用户可以通过该图表回答以下问题：</p>
-    <ul>
-        <li><strong>对比分析：</strong>哪些国家的人均排放量最高（如澳大利亚、美国）？哪些国家较低？</li>
-        <li><strong>趋势观察：</strong>近十年来，各国的排放量是上升还是下降？</li>
-        <li><strong>特定关注：</strong>某一个特定国家的排放轨迹是怎样的？</li>
-    </ul>
+<div class="container">
+    <h1>🌍 全球人均碳排放：十年气候行动追踪（2014-2023）</h1>
+    <div class="subtitle">✨ 悬停查看详情 | 左键点击图例高亮国家 | 右键点击图例查看详细分析 ✨</div>
 
-    <h3>2. 设计决策依据</h3>
-    <ul>
-        <li><strong>可视化编码：</strong>选择了<strong>多折线图</strong>，因为它是展示时间序列数据（年份）和数值变化（排放量）最直观的方式。</li>
-        <li><strong>颜色编码：</strong>使用不同的颜色区分国家，配合图例，帮助用户在密集的线条中快速定位目标。</li>
-        <li><strong>替代方案：</strong>曾考虑使用柱状图，但年份跨度较大（10年），柱状图会显得过于拥挤，折线图更能体现趋势。</li>
-    </ul>
-
-    <h3>3. 外部资源引用</h3>
-    <ul>
-        <li><strong>数据源：</strong><a href="https://data-explorer.oecd.org/vis?df[ds]=DisseminateFinalDMZ&df[id]=DSD_AIR_GHG%40DF_AIR_GHG&df[ag]=OECD.ENV.EPI&dq=.A.GHG._T.KG_CO2E_PS&pd=2014%2C&to[TIME_PERIOD]=false" target="_blank">OECD Data Explorer - Air GHG emissions</a> (人均温室气体排放数据)。</li>
-        <li><strong>技术库：</strong>使用 D3.js (v7) 进行可视化渲染。</li>
-    </ul>
-
-    <h3>4. 开发流程概述</h3>
-    <ul>
-        <li><strong>分工：</strong>个人独立完成。</li>
-        <li><strong>工时：</strong>约 8-10 小时（数据整理 2小时，代码编写 5小时，部署 2小时）。</li>
-        <li><strong>难点：</strong>处理 CSV 数据的格式转换，使其适应 D3 的 line 生成器。</li>
-    </ul>
-    <h3>5.交互技术实现</h3>
-    <ul>
-        <li><strong>鼠标悬停提示：</strong>用户可以在图表上悬停鼠标，查看具体数值。</li>
-        <li><strong>点击图例：</strong>点击底部的国家名称，可以高亮或淡化对应的折线。</li>
-        
-    </ul>
-</div>
-        
-        <!-- 提示框 -->
-        <div id="tooltip" class="tooltip"></div>
+    <div class="control-bar">
+        <button id="resetBtn">🔄 重置视图</button>
+        <button id="topEmittersBtn">🔥 高排放国家（>15吨）</button>
+        <button id="reducersBtn">📉 最大减排国</button>
+        <button id="growersBtn">📈 排放增长国</button>
     </div>
 
-    <script>
-        // 1. 设置画布参数
-        const margin = {top: 40, right: 100, bottom: 60, left: 60};
-        const width = 800 - margin.left - margin.right;
-        const height = 500 - margin.top - margin.bottom;
+    <div class="dashboard">
+        <div class="chart-card">
+            <div class="chart-title">📈 人均排放趋势（2014-2023）</div>
+            <div id="trendChart"></div>
+            <div id="legend" class="legend"></div>
+        </div>
 
-        // 2. 创建 SVG
-        const svg = d3.select("#chart")
+        <div class="chart-card">
+            <div class="chart-title">🏆 排放量排名 <span id="selectedYear" style="color:#667eea;">2023</span></div>
+            <div id="rankingChart"></div>
+            <div class="insight-text" id="rankingInsight">
+                💡 点击左侧趋势图的任意年份数据点，查看该年份的国家排放排名！
+            </div>
+        </div>
+    </div>
+
+    <div class="bottom-charts">
+        <div class="chart-card">
+            <div class="chart-title">📊 十年排放变化率（2014→2023）</div>
+            <div id="changeChart"></div>
+            <div style="font-size: 12px; color: #666; margin-top: 10px; text-align: center;">
+                🟢 绿色=减排 | 🔴 红色=增长 | 条越长变化越大
+            </div>
+        </div>
+
+        <!-- 替换后的图表：排放增减排行榜 -->
+        <div class="chart-card">
+            <div class="chart-title">🏆 排放增减排行榜（2014→2023）</div>
+            <div id="leaderboardChart"></div>
+            <div style="font-size: 12px; color: #666; margin-top: 10px; text-align: center;">
+                🟢 左侧=减排最多 | 🔴 右侧=增长最多 | 点击任意条查看详情
+            </div>
+        </div>
+    </div>
+
+    <div class="stats">
+        <div class="stat-card">
+            <div class="stat-label">🌍 覆盖国家</div>
+            <div class="stat-value" id="countryCount">35</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label" id="avgChangeLabel">📊 相比2014年变化</div>
+            <div class="stat-value" id="avgChange">-15.3%</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label" id="lowestLabel">🏅 2023最低排放国</div>
+            <div class="stat-value" id="lowestCountry">-</div>
+        </div>
+    </div>
+</div>
+
+<div id="countryModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="modalCountryName">国家名称</h2>
+            <span class="close">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div id="modalContent">加载中...</div>
+        </div>
+    </div>
+</div>
+    <!-- ========== 作业说明文档 ========== -->
+    <div style="background: #f5f5f5; border-radius: 15px; padding: 25px; margin-top: 40px; border-top: 3px solid #667eea;">
+        <h2 style="color: #2c3e50; margin-top: 0;">📋 项目说明文档</h2>
+        
+        <div style="background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+            <h3 style="color: #667eea;">1. 可视化方案旨在解答什么问题？</h3>
+            <p>本项目旨在探索 <strong>2014年至2023年间</strong>，全球主要国家（OECD成员国）的<strong>人均温室气体排放量</strong>的变化趋势。用户可以通过交互式图表回答以下核心问题：</p>
+            <ul>
+                <li><strong>对比分析：</strong>哪些国家的人均排放量最高（如澳大利亚、美国）？哪些国家较低（如土耳其、墨西哥）？</li>
+                <li><strong>趋势观察：</strong>近十年来，各国的排放量是上升还是下降？哪些国家减排成效显著？</li>
+                <li><strong>排名探索：</strong>特定年份各国的排放排名如何？谁是最低排放国？</li>
+                <li><strong>变化量化：</strong>各国十年间的排放变化率是多少？绝对减排量有多大？</li>
+            </ul>
+            <p>通过回答这些问题，项目希望帮助公众和政策制定者直观理解全球碳排放格局的变化，识别气候行动的成功案例与挑战。</p>
+        </div>
+
+        <div style="background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+            <h3 style="color: #667eea;">2. 设计决策依据</h3>
+            
+            <h4>📊 可视化编码选择</h4>
+            <ul>
+                <li><strong>主图（多折线图）：</strong>展示时间序列数据（年份 vs 排放量）最直观的方式。用户可以同时追踪多个国家的排放轨迹，对比变化趋势。</li>
+                <li><strong>排名图（水平柱状图）：</strong>按排放量排序，方便快速识别高/低排放国家。柱状图比表格更直观地体现数值差异。</li>
+                <li><strong>变化率条形图：</strong>用绿色/红色区分减排与增长，颜色编码符合直觉（绿=好/减排，红=坏/增长）。</li>
+                <li><strong>增减排行榜：</strong>以零轴线为中心向两侧延伸，清晰展示“谁减排最多”和“谁增长最多”的对立概念。</li>
+            </ul>
+            
+            <h4>🖱️ 交互技术选择</h4>
+            <ul>
+                <li><strong>悬停提示（Tooltip）：</strong>提供即时数值详情，避免图表过于拥挤。</li>
+                <li><strong>图例交互（左键高亮/右键详情）：</strong>左键高亮特定国家折线，解决多线重叠时的可读性问题；右键弹出详细分析卡片，提供深度洞察。</li>
+                <li><strong>点击数据点联动：</strong>点击趋势图上的年份数据点，右侧排名图和统计卡片同步更新，实现多视图协同探索。</li>
+                <li><strong>智能按钮：</strong>快速聚焦高排放国、最大减排国等关键故事，降低探索门槛。</li>
+            </ul>
+            
+            <h4>🤔 替代方案与最终决策</h4>
+            <ul>
+                <li><strong>替代方案1：堆叠面积图</strong> → <strong>拒绝</strong>：会导致各国排放量不可独立追踪。</li>
+                <li><strong>替代方案2：热力图（年份×国家）</strong> → <strong>部分采用</strong>：辅助图表使用颜色编码变化率，但主图保留折线图以突出时间趋势。</li>
+                <li><strong>替代方案3：地图展示</strong> → <strong>拒绝</strong>：地理分布并非本项目的核心叙事重点，且会增加实现复杂度。</li>
+                <li><strong>最终决策依据：</strong>优先保证“时间趋势对比”和“多国家并行比较”两大核心需求，同时通过多视图设计补充截面排名和变化量化信息。</li>
+            </ul>
+        </div>
+
+        <div style="background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+            <h3 style="color: #667eea;">3. 外部资源引用</h3>
+            <ul>
+                <li><strong>数据源：</strong><a href="https://data-explorer.oecd.org/vis?df[ds]=DisseminateFinalDMZ&df[id]=DSD_AIR_GHG%40DF_AIR_GHG&df[ag]=OECD.ENV.EPI&dq=.A.GHG._T.KG_CO2E_PS&pd=2014%2C&to[TIME_PERIOD]=false" target="_blank">OECD Data Explorer - Air GHG emissions</a>（人均温室气体排放数据，单位：吨 CO₂当量/人）。数据包含35个OECD成员国2014-2023年的人均排放量。</li>
+                <li><strong>技术栈：</strong>使用 <a href="https://d3js.org/" target="_blank">D3.js (v7)</a> 进行数据可视化渲染，原生HTML/CSS实现界面布局。</li>
+                <li><strong>灵感参考：</strong>本项目的多视图协同设计受《A Nested Model for Visualization Design and Validation》（Tamara Munzner）启发，遵循“任务-抽象-编码-算法”的设计层次。交互模式参考了NameVoyager的图例点击概念。</li>
+                <li><strong>无第三方代码抄袭：</strong>所有图表均为基于D3.js的原创实现。</li>
+            </ul>
+        </div>
+
+        <div style="background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+            <h3 style="color: #667eea;">4. 开发流程概述</h3>
+            
+            <h4>👥 团队分工</h4>
+            <ul>
+                <li><strong>单人项目</strong>，独立完成所有工作：数据清洗与预处理、D3.js图表编码、交互逻辑实现、CSS样式设计、部署与测试。</li>
+            </ul>
+            
+            <h4>⏱️ 工时统计</h4>
+            <ul>
+                <li><strong>总计耗时：约 18-20 小时</strong></li>
+                <li>数据整理与探索：3小时（下载CSV、检查完整性、处理缺失值）</li>
+                <li>基础图表搭建（折线图+排名图）：5小时（D3比例尺、坐标轴、线条生成）</li>
+                <li>交互功能实现（悬停、点击、图例联动）：4小时</li>
+                <li>多视图扩展（变化率图+排行榜）：4小时</li>
+                <li>模态框详情页与右键菜单：2小时</li>
+                <li>响应式设计与样式优化：2小时</li>
+                <li>文档撰写与GitHub Pages部署：1小时</li>
+            </ul>
+            
+            <h4>⚠️ 最耗时环节</h4>
+            <ul>
+                <li><strong>D3.js 数据绑定与联动更新（约6小时）：</strong>确保点击年份后，排名图、统计卡片、洞察文本全部同步更新，同时保持图例高亮状态正确，是开发中最具挑战性的部分。</li>
+                <li><strong>交互逻辑调试（约3小时）：</strong>区分左键/右键事件、避免事件冒泡、确保tooltip正确显示，花费了大量时间进行边界测试。</li>
+            </ul>
+            
+            <h4>💡 开发经验总结</h4>
+            <ul>
+                <li><strong>成功之处：</strong>多视图协同联动设计满足了用户多角度探索需求；右键弹窗平衡了“简洁界面”与“深度信息”的矛盾。</li>
+                <li><strong>可改进之处：</strong>如果时间允许，可以增加年份范围选择器（如2014-2018），以及导出图表为图片的功能。</li>
+                <li><strong>D3.js建议：</strong>对于复杂的联动场景，建议先设计好数据流（点击→更新全局状态→重绘图表），避免直接在事件中嵌套重绘逻辑。</li>
+            </ul>
+        </div>
+
+        <div style="background: white; border-radius: 12px; padding: 20px;">
+            <h3 style="color: #667eea;">📎 附录：交互功能完整清单</h3>
+            <ul>
+                <li>✅ 鼠标悬停折线图/排名图数据点 → 显示具体数值Tooltip</li>
+                <li>✅ 左键点击图例 → 高亮该国家的折线，淡出其他所有线条</li>
+                <li>✅ 右键点击图例 → 弹出国家详情模态框（含十年关键指标）</li>
+                <li>✅ 点击趋势图数据点 → 更新右侧排名图、统计卡片、洞察文本</li>
+                <li>✅ 控制按钮（高排放/减排/增长）→ 自动高亮对应国家群体</li>
+                <li>✅ 重置按钮 → 恢复所有图表至初始状态</li>
+                <li>✅ 底部双图表 → 展示十年变化率与绝对增减排行榜，支持柱状点击查看详情</li>
+                <li>✅ 响应式布局 → 手机/平板设备自适应</li>
+            </ul>
+            <p style="margin-top: 15px; font-size: 13px; color: #888;">项目部署地址：<a href="https://sleepy8dog.github.io/carbon-viz/" target="_blank">https://sleepy8dog.github.io/carbon-viz/</a></p>
+        </div>
+    </div>
+<div id="tooltip" class="tooltip"></div>
+
+<script>
+    let trendSvg, rankingSvg, changeSvg, leaderboardSvg;
+    let globalData = null;
+    let colorMap = null;
+    
+    d3.csv("data.csv").then(data => {
+        console.log("数据加载成功", data.length, "行");
+        globalData = data;
+        
+        const years = data.map(d => d.year);
+        const countries = Object.keys(data[0]).filter(k => k !== 'year');
+        colorMap = d3.scaleOrdinal(d3.schemeTableau10).domain(countries);
+        
+        updateStats("2023");
+        drawTrendChart(data, years, countries);
+        drawRankingChart(data, "2023");
+        drawChangeChart(data, countries);
+        drawLeaderboardChart(data, countries);  // 新图表
+        bindControlButtons(data, countries);
+        generateLegend(countries);
+        
+        const modal = document.getElementById("countryModal");
+        const closeBtn = document.querySelector(".close");
+        closeBtn.onclick = () => modal.style.display = "none";
+        window.onclick = (e) => { if (e.target === modal) modal.style.display = "none"; };
+        
+    }).catch(error => {
+        console.error("数据加载失败", error);
+        alert("无法加载 data.csv 文件，请确保文件存在");
+    });
+    
+    // ========== 新图表：排放增减排行榜（更具可读性） ==========
+    function drawLeaderboardChart(data, countries) {
+        const margin = {top: 50, right: 30, bottom: 20, left: 100};
+        const width = 450 - margin.left - margin.right;
+        const height = 400 - margin.top - margin.bottom;
+        
+        const data2014 = data.find(d => d.year === "2014");
+        const data2023 = data.find(d => d.year === "2023");
+        
+        // 计算每个国家的排放变化（绝对值）
+        const changes = countries.map(c => ({
+            name: c,
+            change: +data2023[c] - +data2014[c],  // 绝对变化（吨）
+            changePercent: ((+data2023[c] - +data2014[c]) / +data2014[c] * 100).toFixed(1)
+        })).sort((a,b) => a.change - b.change);  // 从小到大排序（左边减排多，右边增长多）
+        
+        d3.select("#leaderboardChart").html("");
+        
+        leaderboardSvg = d3.select("#leaderboardChart")
             .append("svg")
             .attr("width", width + margin.left + margin.right)
             .attr("height", height + margin.top + margin.bottom)
             .append("g")
             .attr("transform", `translate(${margin.left},${margin.top})`);
-
-        // 3. 定义颜色
-        const colorScale = d3.scaleOrdinal(d3.schemeCategory10);
-
-        // 4. 读取数据
-        d3.csv("data.csv").then(data => {
-            // 数据处理：转换数据格式以便绘图
-            const years = data.map(d => d.year);
-            const countries = Object.keys(data[0]).slice(1); // 获取所有国家名
-
-            // 为每个国家生成一条线的数据
-            const lines = countries.map(country => ({
-                name: country,
-                values: data.map(d => ({year: d.year, emission: +d[country]}))
-            }));
-
-            // 设置颜色域
-            colorScale.domain(countries);
-
-            // 5. 定义比例尺 (Scales)
-            const x = d3.scalePoint().domain(years).range([0, width]);
-            const y = d3.scaleLinear().domain([0, 25]).range([height, 0]); // OECD数据最大约22，设为25留出空间
-
-            // 6. 定义线条生成器
-            const line = d3.line()
-                .x(d => x(d.year))
-                .y(d => y(d.emission))
-                .curve(d3.curveMonotoneX); // 平滑曲线
-
-            // 7. 绘制坐标轴
-            svg.append("g")
-                .attr("transform", `translate(0,${height})`)
-                .call(d3.axisBottom(x))
-                .append("text")
-                .attr("x", width/2)
-                .attr("y", 40)
-                .attr("fill", "#000")
-                .text("年份");
-
-            svg.append("g")
-                .call(d3.axisLeft(y))
-                .append("text")
-                .attr("transform", "rotate(-90)")
-                .attr("y", -40)
-                .attr("x", -height/2)
-                .attr("fill", "#000")
-                .text("人均排放量 (吨 CO2当量)");
-
-            // 8. 绘制折线
-            const paths = svg.selectAll(".line")
-                .data(lines)
-                .enter()
-                .append("g")
-                .attr("class", "line-group")
-                .append("path")
-                .attr("class", "line")
-                .attr("d", d => line(d.values))
-                .attr("fill", "none")
-                .attr("stroke", d => colorScale(d.name))
-                .attr("stroke-width", 2)
-                .style("opacity", 0.8);
-
-            // 9. 添加数据点 (圆圈)
-            const dots = svg.selectAll(".dot-group")
-                .data(lines)
-                .enter()
-                .append("g")
-                .attr("class", "dot-group")
-                .selectAll(".dot")
-                .data(d => d.values.map(v => ({...v, country: d.name})))
-                .enter()
-                .append("circle")
-                .attr("class", "dot")
-                .attr("cx", d => x(d.year))
-                .attr("cy", d => y(d.emission))
-                .attr("r", 4)
-                .attr("fill", d => colorScale(d.country))
-                .style("opacity", 0.9);
-
-            // 10. 交互功能：鼠标悬停 (Tooltip)
-            const tooltip = d3.select("#tooltip");
-            
-            // 给圆点添加监听
-            dots.on("mouseover", function(event, d) {
+        
+        const y = d3.scaleBand()
+            .domain(changes.map(d => d.name))
+            .range([0, height])
+            .padding(0.1);
+        
+        // 找到最大绝对值，用于确定x轴范围
+        const maxAbs = Math.max(Math.abs(d3.min(changes, d => d.change)), Math.abs(d3.max(changes, d => d.change)));
+        const x = d3.scaleLinear()
+            .domain([-maxAbs - 1, maxAbs + 1])
+            .range([0, width]);
+        
+        // 添加零轴线
+        leaderboardSvg.append("line")
+            .attr("x1", x(0))
+            .attr("y1", 0)
+            .attr("x2", x(0))
+            .attr("y2", height)
+            .attr("stroke", "#999")
+            .attr("stroke-width", 1.5)
+            .attr("stroke-dasharray", "4,4");
+        
+        // 绘制条形（向左=减排，向右=增长）
+        leaderboardSvg.selectAll("rect")
+            .data(changes)
+            .enter()
+            .append("rect")
+            .attr("y", d => y(d.name))
+            .attr("height", y.bandwidth())
+            .attr("x", d => d.change >= 0 ? x(0) : x(d.change))
+            .attr("width", d => Math.abs(x(d.change) - x(0)))
+            .attr("fill", d => d.change >= 0 ? "#e74c3c" : "#27ae60")
+            .attr("opacity", 0.8)
+            .style("cursor", "pointer")
+            .on("mouseover", function(e, d) {
+                const tooltip = d3.select("#tooltip");
                 tooltip.style("opacity", 1)
-                    .html(`<b>${d.country}</b><br/>${d.year}: ${d.emission} 吨`)
-                    .style("left", (event.pageX + 10) + "px")
-                    .style("top", (event.pageY - 28) + "px");
-                
-                // 高亮当前圆点
-                d3.select(this).attr("r", 6).style("opacity", 1);
-            })
-            .on("mousemove", function(event, d) {
-                tooltip.style("left", (event.pageX + 10) + "px")
-                       .style("top", (event.pageY - 28) + "px");
+                    .html(`<strong>${d.name}</strong><br>📊 变化: ${d.change >= 0 ? '+' : ''}${d.change.toFixed(2)} 吨<br>📈 变化率: ${d.changePercent >= 0 ? '+' : ''}${d.changePercent}%`)
+                    .style("left", (e.pageX + 15) + "px")
+                    .style("top", (e.pageY - 35) + "px");
+                d3.select(this).attr("opacity", 1);
             })
             .on("mouseout", function() {
-                tooltip.style("opacity", 0);
-                d3.select(this).attr("r", 4).style("opacity", 0.9);
-            });
-
-            // 11. 交互功能：图例点击 (高亮/淡化)
-            const legend = d3.select("#legend");
-            
-            legend.selectAll(".legend-item")
-                .data(countries)
-                .enter()
-                .append("span")
-                .attr("class", "legend-item")
-                .style("color", d => colorScale(d))
-                .text(d => d)
-                .on("click", function(event, countryName) {
-                    // 获取当前点击的图例元素
-                  const item = d3.select(this);
-                  // 切换选中状态
-                  const isActive = item.classed("active");
-                  item.classed("active", !isActive);
-
-                  // 根据状态改变图表中线条和圆点的透明度
-                  svg.selectAll(".line-group").filter(d => d.name === countryName)
-                     .transition().duration(300)
-                     .style("opacity", isActive ? 0.2 : 1);
-
-                  svg.selectAll(".dot-group").filter(d => d.name === countryName)
-                     .transition().duration(300)
-                     .style("opacity", isActive ? 0.2 : 1);
-                });
-        }).catch(error => {
-            console.error("数据加载失败，请确保 data.csv 和 index.html 在同一个文件夹，并使用 Live Server 打开。", error);
-            alert("数据加载失败！请检查控制台错误。");
+                hideTooltip();
+                d3.select(this).attr("opacity", 0.8);
+            })
+            .on("click", (e, d) => showCountryDetail(d.name));
+        
+        // 添加数值标签
+        leaderboardSvg.selectAll(".value-label")
+            .data(changes)
+            .enter()
+            .append("text")
+            .attr("x", d => d.change >= 0 ? x(d.change) + 5 : x(d.change) - 5)
+            .attr("y", d => y(d.name) + y.bandwidth()/2)
+            .attr("dy", ".35em")
+            .attr("text-anchor", d => d.change >= 0 ? "start" : "end")
+            .text(d => `${d.change >= 0 ? '+' : ''}${d.change.toFixed(1)}吨`)
+            .style("font-size", "9px")
+            .style("fill", "#333");
+        
+        leaderboardSvg.append("g")
+            .call(d3.axisLeft(y))
+            .style("font-size", "8px");
+        
+        leaderboardSvg.append("g")
+            .attr("transform", `translate(0,${height})`)
+            .call(d3.axisBottom(x).ticks(6))
+            .style("font-size", "10px");
+        
+        // 添加两侧说明文字
+        leaderboardSvg.append("text")
+            .attr("x", 20)
+            .attr("y", -15)
+            .attr("text-anchor", "middle")
+            .style("fill", "#27ae60")
+            .style("font-size", "11px")
+            .text("← 减排最多");
+        
+        leaderboardSvg.append("text")
+            .attr("x", width - 30)
+            .attr("y", -15)
+            .attr("text-anchor", "middle")
+            .style("fill", "#e74c3c")
+            .style("font-size", "11px")
+            .text("增长最多 →");
+    }
+    
+    // ========== 图表1：十年排放变化率条形图 ==========
+    function drawChangeChart(data, countries) {
+        const margin = {top: 60, right: 30, bottom: 20, left: 100};
+        const width = 450 - margin.left - margin.right;
+        const height = 400 - margin.top - margin.bottom;
+        
+        const data2014 = data.find(d => d.year === "2014");
+        const data2023 = data.find(d => d.year === "2023");
+        
+        const changes = countries.map(c => ({
+            name: c,
+            change: ((+data2023[c] - +data2014[c]) / +data2014[c]) * 100
+        })).sort((a,b) => a.change - b.change);
+        
+        d3.select("#changeChart").html("");
+        
+        changeSvg = d3.select("#changeChart")
+            .append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+            .attr("transform", `translate(${margin.left},${margin.top})`);
+        
+        const y = d3.scaleBand()
+            .domain(changes.map(d => d.name))
+            .range([0, height])
+            .padding(0.1);
+        
+        const x = d3.scaleLinear()
+            .domain([d3.min(changes, d => d.change) - 5, d3.max(changes, d => d.change) + 5])
+            .range([0, width]);
+        
+        changeSvg.selectAll("rect")
+            .data(changes)
+            .enter()
+            .append("rect")
+            .attr("y", d => y(d.name))
+            .attr("height", y.bandwidth())
+            .attr("x", d => d.change >= 0 ? x(0) : x(d.change))
+            .attr("width", d => Math.abs(x(d.change) - x(0)))
+            .attr("fill", d => d.change >= 0 ? "#e74c3c" : "#27ae60")
+            .attr("opacity", 0.8)
+            .on("mouseover", (e,d) => showTooltip(e, d.name, "变化率", `${d.change.toFixed(1)}%`))
+            .on("mouseout", hideTooltip);
+        
+        changeSvg.append("g")
+            .call(d3.axisLeft(y))
+            .style("font-size", "9px");
+        
+        changeSvg.append("g")
+            .attr("transform", `translate(0,${height})`)
+            .call(d3.axisBottom(x))
+            .style("font-size", "10px");
+        
+        changeSvg.append("text")
+            .attr("x", width/2)
+            .attr("y", -10)
+            .attr("text-anchor", "middle")
+            .style("fill", "#666")
+            .style("font-size", "11px")
+            .text("排放变化率（%）");
+    }
+    
+    function showCountryDetail(countryName) {
+        if (!globalData) return;
+        const years = globalData.map(d => d.year);
+        const emissions = globalData.map(d => +d[countryName]);
+        const startEm = emissions[0];
+        const endEm = emissions[emissions.length-1];
+        const change = ((endEm - startEm) / startEm * 100).toFixed(1);
+        const maxEm = Math.max(...emissions);
+        const maxYear = years[emissions.indexOf(maxEm)];
+        const minEm = Math.min(...emissions);
+        const minYear = years[emissions.indexOf(minEm)];
+        
+        const year2023 = globalData.find(d => d.year === "2023");
+        const allEm2023 = Object.keys(year2023).filter(k => k !== 'year').map(c => ({name: c, value: +year2023[c]}));
+        const sorted = allEm2023.sort((a,b) => b.value - a.value);
+        const rank = sorted.findIndex(c => c.name === countryName) + 1;
+        
+        const trendClass = change < 0 ? "trend-down" : "trend-up";
+        const trendIcon = change < 0 ? "📉" : "📈";
+        
+        let badge = '';
+        if (endEm > 15) badge = '<span class="badge badge-high">高排放国</span>';
+        else if (endEm > 8) badge = '<span class="badge badge-mid">中等排放</span>';
+        else badge = '<span class="badge badge-low">低排放国</span>';
+        
+        const modalContent = `
+            <div style="text-align: center;">
+                <div style="font-size: 48px; margin-bottom: 10px;">${trendIcon}</div>
+                <h3>${countryName} ${badge}</h3>
+                <p style="color: #666;">2014-2023 人均碳排放趋势分析</p>
+            </div>
+            <div class="country-stats">
+                <div class="country-stat-card"><div>📅 2014年</div><div class="country-stat-value">${startEm.toFixed(2)}</div><div>吨 CO₂/人</div></div>
+                <div class="country-stat-card"><div>📅 2023年</div><div class="country-stat-value">${endEm.toFixed(2)}</div><div>吨 CO₂/人</div></div>
+                <div class="country-stat-card"><div>📈 十年变化</div><div class="country-stat-value ${trendClass}">${change}%</div><div>${change < 0 ? '减排成功' : '排放增长'}</div></div>
+                <div class="country-stat-card"><div>🏆 2023年排名</div><div class="country-stat-value">#${rank}</div><div>/${sorted.length}个国家</div></div>
+            </div>
+            <div style="background: #f0f0f0; border-radius: 12px; padding: 15px; margin-top: 10px;">
+                <strong>📊 关键洞察：</strong><br>
+                • 峰值出现在 ${maxYear} 年，达到 ${maxEm.toFixed(2)} 吨<br>
+                • 谷值出现在 ${minYear} 年，为 ${minEm.toFixed(2)} 吨<br>
+                • 十年间 ${change < 0 ? '减少了' : '增加了'} ${Math.abs(change)}%
+                ${change < 0 ? '<br>✅ 气候政策可能起到了积极作用' : '<br>⚠️ 减排压力仍然较大'}
+            </div>
+            <div style="margin-top: 15px; text-align: center; font-size: 12px; color: #888;">数据来源：OECD 数据库</div>
+        `;
+        document.getElementById("modalCountryName").innerHTML = `${countryName} ${trendIcon}`;
+        document.getElementById("modalContent").innerHTML = modalContent;
+        document.getElementById("countryModal").style.display = "block";
+    }
+    
+    function highlightCountry(countryName) {
+        d3.selectAll("[class^='line-']").attr("opacity", 0.1);
+        d3.selectAll("circle").attr("opacity", 0.1);
+        d3.selectAll(`[class^="line-${countryName.replace(/\s/g, '')}"]`).attr("opacity", 1);
+        d3.selectAll(`circle[data-country="${countryName}"]`).attr("opacity", 1);
+    }
+    
+    function updateStats(year) {
+        if (!globalData) return;
+        const targetYear = year || "2023";
+        const yearData = globalData.find(d => d.year === targetYear);
+        if (!yearData) return;
+        const countries = Object.keys(yearData).filter(k => k !== 'year');
+        d3.select("#countryCount").text(countries.length);
+        const lowest = countries.reduce((min, c) => +yearData[c] < +yearData[min] ? c : min, countries[0]);
+        d3.select("#lowestCountry").html(`${lowest}<br><span style="font-size:11px">${(+yearData[lowest]).toFixed(1)} 吨</span>`);
+        d3.select("#lowestLabel").html(`🏅 ${targetYear}最低排放国`);
+        
+        const data2014 = globalData.find(d => d.year === "2014");
+        if (data2014) {
+            const changes = [];
+            for (let country of countries) {
+                const oldVal = +data2014[country];
+                const newVal = +yearData[country];
+                if (oldVal !== 0 && !isNaN(oldVal) && !isNaN(newVal)) {
+                    changes.push(((newVal - oldVal) / oldVal) * 100);
+                }
+            }
+            if (changes.length > 0) {
+                const avgChange = (changes.reduce((a, b) => a + b, 0) / changes.length).toFixed(1);
+                const prefix = avgChange > 0 ? '+' : '';
+                if (targetYear === "2014") {
+                    d3.select("#avgChange").html(`0%<br><span style="font-size:10px">基准年份</span>`);
+                    d3.select("#avgChangeLabel").html(`📊 基准年份`);
+                } else {
+                    d3.select("#avgChange").html(`${prefix}${avgChange}%<br><span style="font-size:10px">相比2014年</span>`);
+                    d3.select("#avgChangeLabel").html(`📊 ${targetYear} vs 2014`);
+                }
+            }
+        }
+    }
+    
+    function drawTrendChart(data, years, countries) {
+        const margin = {top: 40, right: 100, bottom: 60, left: 70};
+        const width = 700 - margin.left - margin.right;
+        const height = 450 - margin.top - margin.bottom;
+        d3.select("#trendChart").html("");
+        const svg = d3.select("#trendChart").append("svg").attr("width", width + margin.left + margin.right).attr("height", height + margin.top + margin.bottom).append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+        const x = d3.scalePoint().domain(years).range([0, width]).padding(0.5);
+        const y = d3.scaleLinear().domain([0, 25]).range([height, 0]);
+        svg.append("g").attr("transform", `translate(0,${height})`).call(d3.axisBottom(x).tickValues(years.filter((_,i) => i % 2 === 0)));
+        svg.append("g").call(d3.axisLeft(y));
+        svg.append("text").attr("x", width/2).attr("y", height + 40).attr("text-anchor", "middle").text("年份");
+        svg.append("text").attr("transform", "rotate(-90)").attr("y", -50).attr("x", -height/2).attr("text-anchor", "middle").text("人均排放量（吨 CO₂当量）");
+        const line = d3.line().x(d => x(d.year)).y(d => y(d.value)).curve(d3.curveMonotoneX);
+        countries.forEach(c => { const values = data.map(d => ({year: d.year, value: +d[c]})); svg.append("path").datum(values).attr("class", `line-${c.replace(/\s/g, '')}`).attr("fill", "none").attr("stroke", colorMap(c)).attr("stroke-width", 1.8).attr("opacity", 0.6).attr("d", d => line(d)); });
+        countries.forEach(c => { data.forEach(row => { const year = row.year, value = +row[c]; svg.append("circle").attr("cx", x(year)).attr("cy", y(value)).attr("r", 4).attr("fill", colorMap(c)).attr("stroke", "white").attr("stroke-width", 1.5).attr("opacity", 0.8).attr("data-country", c).attr("data-year", year).style("cursor", "pointer").on("mouseover", function(e) { showTooltip(e, c, year, value); d3.select(this).attr("r", 7); }).on("mouseout", function() { hideTooltip(); d3.select(this).attr("r", 4); }).on("click", function() { const clickedYear = d3.select(this).attr("data-year"); d3.select("#selectedYear").text(clickedYear); drawRankingChart(globalData, clickedYear); updateStats(clickedYear); svg.selectAll("circle").attr("stroke", "white").attr("stroke-width", 1.5); d3.select(this).attr("stroke", "#ff6b6b").attr("stroke-width", 3); const yearData = globalData.find(d => d.year === clickedYear); if (yearData) { const list = Object.keys(yearData).filter(k => k !== 'year'); const maxC = list.reduce((max, cc) => +yearData[cc] > +yearData[max] ? cc : max, list[0]); const minC = list.reduce((min, cc) => +yearData[cc] < +yearData[min] ? cc : min, list[0]); d3.select("#rankingInsight").html(`💡 正在显示 <strong>${clickedYear}</strong> 年的排放排名。<br>📊 ${clickedYear}年：${maxC}最高(${+yearData[maxC].toFixed(1)}吨)，${minC}最低(${+yearData[minC].toFixed(1)}吨)。`); } }); }); });
+        trendSvg = svg;
+    }
+    
+    function drawRankingChart(data, year) {
+        const margin = {top: 30, right: 30, bottom: 100, left: 130};
+        const width = 450 - margin.left - margin.right;
+        const height = 420 - margin.top - margin.bottom;
+        d3.select("#rankingChart").html("");
+        const svg = d3.select("#rankingChart").append("svg").attr("width", width + margin.left + margin.right).attr("height", height + margin.top + margin.bottom).append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+        const yearRow = data.find(d => d.year === year);
+        if (!yearRow) return;
+        const countries = Object.keys(yearRow).filter(k => k !== 'year');
+        const ranking = countries.map(c => ({name: c, value: +yearRow[c]})).sort((a,b) => b.value - a.value);
+        const top20 = ranking.slice(0, 20);
+        const y = d3.scaleBand().domain(top20.map(d => d.name)).range([0, height]).padding(0.2);
+        const x = d3.scaleLinear().domain([0, d3.max(top20, d => d.value) + 2]).range([0, width]);
+        svg.selectAll("rect").data(top20).enter().append("rect").attr("y", d => y(d.name)).attr("height", y.bandwidth()).attr("x", 0).attr("width", d => x(d.value)).attr("fill", d => colorMap(d.name)).attr("opacity", 0.8).on("mouseover", (e,d) => showTooltip(e, d.name, year, d.value)).on("mouseout", hideTooltip);
+        svg.selectAll(".value-label").data(top20).enter().append("text").attr("x", d => x(d.value) + 5).attr("y", d => y(d.name) + y.bandwidth()/2).attr("dy", ".35em").text(d => d.value.toFixed(1)).style("font-size", "10px");
+        svg.append("g").call(d3.axisLeft(y).tickSize(0)).style("font-size", "9px");
+        svg.append("g").attr("transform", `translate(0,${height})`).call(d3.axisBottom(x).ticks(5));
+        rankingSvg = svg;
+    }
+    
+    function generateLegend(countries) {
+        const legendDiv = d3.select("#legend");
+        legendDiv.html("");
+        countries.forEach(country => {
+            legendDiv.append("span").attr("class", "legend-item").style("border-left", `4px solid ${colorMap(country)}`).text(country).on("click", function(e) { e.stopPropagation(); highlightCountry(country); d3.select("#rankingInsight").html(`💡 已高亮显示 <strong>${country}</strong> 的排放趋势。<br>🖱️ 右键点击图例可查看详细分析卡片。`); }).on("contextmenu", function(e) { e.preventDefault(); e.stopPropagation(); showCountryDetail(country); return false; });
         });
-    </script>
+    }
+    
+    function bindControlButtons(data, countries) {
+        d3.select("#resetBtn").on("click", () => {
+            d3.selectAll("[class^='line-']").attr("opacity", 0.6);
+            d3.selectAll("circle").attr("opacity", 0.8);
+            drawRankingChart(data, "2023");
+            d3.select("#selectedYear").text("2023");
+            updateStats("2023");
+            if (trendSvg) trendSvg.selectAll("circle").attr("stroke", "white").attr("stroke-width", 1.5);
+            d3.select("#rankingInsight").html(`💡 点击左侧趋势图的任意年份数据点，查看该年份的国家排放排名！`);
+        });
+        d3.select("#topEmittersBtn").on("click", () => {
+            const yearData = data.find(d => d.year === "2023");
+            const high = countries.filter(c => +yearData[c] > 15);
+            d3.selectAll("[class^='line-']").attr("opacity", 0.1);
+            d3.selectAll("circle").attr("opacity", 0.1);
+            high.forEach(c => { d3.selectAll(`[class^="line-${c.replace(/\s/g, '')}"]`).attr("opacity", 1); d3.selectAll(`circle[data-country="${c}"]`).attr("opacity", 1); });
+            d3.select("#rankingInsight").html(`🔥 高排放国家（>15吨）：${high.join(", ")}`);
+        });
+        d3.select("#reducersBtn").on("click", () => {
+            const d14 = data.find(d => d.year === "2014"), d23 = data.find(d => d.year === "2023");
+            const red = countries.map(c => ({name: c, reduction: +d14[c] - +d23[c]})).sort((a,b) => b.reduction - a.reduction).slice(0,5).map(r => r.name);
+            d3.selectAll("[class^='line-']").attr("opacity", 0.1);
+            d3.selectAll("circle").attr("opacity", 0.1);
+            red.forEach(c => { d3.selectAll(`[class^="line-${c.replace(/\s/g, '')}"]`).attr("opacity", 1); d3.selectAll(`circle[data-country="${c}"]`).attr("opacity", 1); });
+            d3.select("#rankingInsight").html(`📉 十年减排最多：${red.join(", ")}`);
+        });
+        d3.select("#growersBtn").on("click", () => {
+            const d14 = data.find(d => d.year === "2014"), d23 = data.find(d => d.year === "2023");
+            const growers = countries.filter(c => +d23[c] > +d14[c]);
+            d3.selectAll("[class^='line-']").attr("opacity", 0.1);
+            d3.selectAll("circle").attr("opacity", 0.1);
+            growers.forEach(c => { d3.selectAll(`[class^="line-${c.replace(/\s/g, '')}"]`).attr("opacity", 1); d3.selectAll(`circle[data-country="${c}"]`).attr("opacity", 1); });
+            d3.select("#rankingInsight").html(`📈 排放增长国家：${growers.join(", ")}`);
+        });
+    }
+    
+    function showTooltip(event, country, year, value) {
+        const tooltip = d3.select("#tooltip");
+        tooltip.style("opacity", 1).html(`<strong>${country}</strong><br>📅 ${year}<br>💨 ${parseFloat(value).toFixed(2)} 吨`).style("left", (event.pageX + 15) + "px").style("top", (event.pageY - 35) + "px");
+    }
+    function hideTooltip() { d3.select("#tooltip").style("opacity", 0); }
+</script>
 </body>
 </html>
